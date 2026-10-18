@@ -235,6 +235,16 @@ const HELP_TEXT = [
   '',
   '---',
   '',
+  '## 用量与历史',
+  '',
+  '| 命令 | 作用 |',
+  '| :--- | :--- |',
+  '| /usage | 查看当前会话的上下文用量与最近一次调用的 token |',
+  '| /compact | 手动压缩当前会话的历史（任务空闲时可用） |',
+  '| /search 关键词 | 在所有历史会话里搜索 |',
+  '',
+  '---',
+  '',
   '| 其他命令 | 作用 |',
   '| :--- | :--- |',
   '| /start | 确认 Bot 在线 |',
@@ -255,8 +265,45 @@ const MY_COMMANDS = [
   { command: 'discard', description: '放弃本次收集' },
   { command: 'followup', description: '将消息排到当前任务之后' },
   { command: 'resend', description: '重发最后一份完整结果' },
+  { command: 'usage', description: '查看当前会话的上下文用量' },
+  { command: 'compact', description: '压缩当前会话的历史' },
+  { command: 'search', description: '搜索历史会话' },
   { command: 'help', description: '查看使用帮助' },
 ]
+
+/** Minimal shapes of the optional host services the extra commands use. */
+interface TokenMeterLike {
+  measure(session: unknown): {
+    readonly totalTokens: number
+    readonly surfaceTokens: number
+    readonly baseline: {
+      readonly kind: string
+      readonly tokens: number
+      readonly usage?: {
+        readonly inputTokens: number
+        readonly outputTokens: number
+        readonly cacheReadTokens?: number
+        readonly reasoningTokens?: number
+      }
+    }
+  }
+}
+
+interface CompactionLike {
+  compactNow(agent: unknown, signal: AbortSignal): Promise<{
+    readonly shadowedTokenCount: number
+    readonly shadowedSeqs: readonly number[]
+  } | null>
+}
+
+interface SessionQueryLike {
+  searchSessions(request: { readonly query: string; readonly limit?: number }): Promise<{
+    readonly items: readonly {
+      readonly header: { readonly id: string }
+      readonly bestMatch: { readonly snippet: string }
+    }[]
+  }>
+}
 
 // Floor between polls so an instant-empty transport cannot hot-loop the
 // event loop; real long polling already blocks for the polling timeout.
@@ -503,6 +550,113 @@ export class TelegramBridge {
       const timer = setTimeout(resolve, ms)
       signal?.addEventListener('abort', () => { clearTimeout(timer); resolve() }, { once: true })
     }))
+  }
+
+  /** Report the bound session's context pressure through the optional meter. */
+  private async showUsage(chatId: number): Promise<void> {
+    const active = this.chats.get(chatId)?.active
+    if (active === undefined) {
+      await this.safeSend(chatId, '⚠️ **尚未选择会话**\n\n请先打开 /menu 选择工作区和会话。')
+      return
+    }
+    const meter = this.ctx.get('tokenMeter') as TokenMeterLike | undefined
+    if (meter === undefined) {
+      await this.safeSend(chatId, 'ℹ️ **未启用 token 计量**\n\n当前部署没有挂载 tokenMeter 服务。')
+      return
+    }
+    const agent = this.ctx.agents.get(active.sessionId)
+    if (agent === undefined) {
+      await this.safeSend(chatId, 'ℹ️ **会话当前未激活**\n\n先发一条消息，再查看用量。')
+      return
+    }
+    try {
+      const measured = meter.measure(agent.session)
+      const lines = [
+        '## 📊 上下文用量',
+        '',
+        '| 项目 | Token |',
+        '| :--- | ---: |',
+        `| 当前上下文 | ${richLiteral(String(measured.totalTokens))} |`,
+        `| 表面节点 | ${richLiteral(String(measured.surfaceTokens))} |`,
+        `| 基线（${measured.baseline.kind}） | ${richLiteral(String(measured.baseline.tokens))} |`,
+      ]
+      const usage = measured.baseline.usage
+      if (usage !== undefined) {
+        lines.push('', '### 最近一次调用', '', '| 项目 | Token |', '| :--- | ---: |',
+          `| 输入 | ${richLiteral(String(usage.inputTokens))} |`,
+          `| 输出 | ${richLiteral(String(usage.outputTokens))} |`)
+        if (usage.cacheReadTokens !== undefined) lines.push(`| 缓存读取 | ${richLiteral(String(usage.cacheReadTokens))} |`)
+        if (usage.reasoningTokens !== undefined) lines.push(`| 推理 | ${richLiteral(String(usage.reasoningTokens))} |`)
+      }
+      await this.safeSend(chatId, lines.join('\n'))
+    } catch (error) {
+      this.ctx.logger.warn('[telegram] token measurement failed: %s', messageOf(error))
+      await this.safeSend(chatId, '⚠️ **用量读取失败**\n\n详细原因见 DSH 日志。')
+    }
+  }
+
+  /** Compact the bound session on demand through the optional compaction service. */
+  private async compactCurrent(chatId: number): Promise<void> {
+    const active = this.chats.get(chatId)?.active
+    if (active === undefined) {
+      await this.safeSend(chatId, '⚠️ **尚未选择会话**\n\n请先打开 /menu 选择工作区和会话。')
+      return
+    }
+    const compaction = this.ctx.get('compaction') as CompactionLike | undefined
+    if (compaction === undefined) {
+      await this.safeSend(chatId, 'ℹ️ **未启用压缩**\n\n当前部署没有挂载 compaction 服务。')
+      return
+    }
+    const agent = this.ctx.agents.get(active.sessionId)
+    if (agent === undefined) {
+      await this.safeSend(chatId, 'ℹ️ **会话当前未激活**\n\n先发一条消息，再压缩历史。')
+      return
+    }
+    if (agent.status === 'running') {
+      await this.safeSend(chatId, '⏳ **任务进行中**\n\n等当前任务结束后再压缩，避免打断上下文。')
+      return
+    }
+    try {
+      const result = await compaction.compactNow(agent, this.abortController.signal)
+      await this.safeSend(chatId, result === null
+        ? 'ℹ️ **无需压缩**\n\n当前历史没有可安全压缩的区段。'
+        : `🗜 **已压缩历史**\n\n折叠 ${richLiteral(String(result.shadowedSeqs.length))} 个节点，节省约 ${richLiteral(String(result.shadowedTokenCount))} tokens。`)
+    } catch (error) {
+      this.ctx.logger.warn('[telegram] compaction failed: %s', messageOf(error))
+      await this.safeSend(chatId, `⚠️ **压缩失败**\n\n${richCodeBlock(messageOf(error))}`)
+    }
+  }
+
+  /** Search the whole session corpus through the optional query service. */
+  private async searchHistory(chatId: number, query: string): Promise<void> {
+    const text = query.trim()
+    if (text === '') {
+      await this.safeSend(chatId, '🔍 **用法**\n\n`/search 关键词`\n\n在当前 DSH 的所有历史会话里搜索。')
+      return
+    }
+    const sessionQuery = this.ctx.get('sessionQuery') as SessionQueryLike | undefined
+    if (sessionQuery === undefined) {
+      await this.safeSend(chatId, 'ℹ️ **未启用会话搜索**\n\n当前部署没有挂载 sessionQuery 服务。')
+      return
+    }
+    try {
+      const page = await sessionQuery.searchSessions({ query: text, limit: 5 })
+      if (page.items.length === 0) {
+        await this.safeSend(chatId, `🔍 **没有匹配**\n\n关键词：${richLiteral(text)}`)
+        return
+      }
+      const lines = [`## 🔍 搜索：${richLiteral(text)}`, '']
+      for (const item of page.items) {
+        const snippet = item.bestMatch.snippet.replace(/\s+/g, ' ').trim()
+        lines.push(`- \`${richLiteral(item.header.id)}\``)
+        if (snippet !== '') lines.push(`  ${richLiteral(snippet.length > 120 ? `${snippet.slice(0, 120)}…` : snippet)}`)
+      }
+      lines.push('', '---', '', '在 /menu 里打开对应会话继续。')
+      await this.safeSend(chatId, lines.join('\n'))
+    } catch (error) {
+      this.ctx.logger.warn('[telegram] session search failed: %s', messageOf(error))
+      await this.safeSend(chatId, `⚠️ **搜索失败**\n\n${richCodeBlock(messageOf(error))}`)
+    }
   }
 
   /** Register DSH listeners, publish the command list, and start polling. */
@@ -773,6 +927,15 @@ export class TelegramBridge {
       }
       case '/followup':
         await this.safeSend(chatId, FOLLOWUP_HELP)
+        return
+      case '/usage':
+        await this.showUsage(chatId)
+        return
+      case '/compact':
+        await this.compactCurrent(chatId)
+        return
+      case '/search':
+        await this.searchHistory(chatId, argsText)
         return
       default:
         await this.safeSend(chatId, `❔ **未知命令**\n\n${richLiteral(command)}\n\n发送 \`/help\` 查看可用命令。`)

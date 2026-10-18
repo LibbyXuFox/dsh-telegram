@@ -61,6 +61,12 @@ export declare class TelegramBridge {
      * @param options - bridge options.
      */
     constructor(ctx: Context, options: TelegramBridgeOptions);
+    /** Report the bound session's context pressure through the optional meter. */
+    private showUsage;
+    /** Compact the bound session on demand through the optional compaction service. */
+    private compactCurrent;
+    /** Search the whole session corpus through the optional query service. */
+    private searchHistory;
     /** Register DSH listeners, publish the command list, and start polling. */
     start(): void;
     /** Stop polling and release Telegram state; DSH sessions and Agents keep running. */
