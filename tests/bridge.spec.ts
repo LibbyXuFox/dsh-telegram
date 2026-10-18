@@ -709,4 +709,22 @@ describe('TelegramBridge diagnostics commands', () => {
     await h.text('/search')
     expect(h.lastText()).toContain('用法')
   })
+
+  it('labels a hit with its workspace and title and offers an open button', async () => {
+    const searchSessions = vi.fn(async () => ({
+      items: [{ header: { id: 'session-1' }, bestMatch: { snippet: '命中的内容' } }],
+    }))
+    const readTitleSnapshots = vi.fn(async (ids: readonly string[]) => ids.map(id => ({
+      sessionId: id, status: 'fulfilled' as const, value: { title: { title: '旧会话标题' } },
+    })))
+    const h = createHarness({}, { services: { sessionQuery: { searchSessions, readTitleSnapshots } } })
+    await h.newSession()
+    await h.text('/search 关键词')
+    // The harness has one workspace named `demo`, and session-1 belongs to it.
+    expect(h.lastText()).toContain('demo — 旧会话标题')
+    expect(h.buttons().some(item => item.text.includes('打开'))).toBe(true)
+    await h.click('打开')
+    // session-1 is already bound, so the tap reports that instead of rebinding.
+    expect(h.lastText()).toContain('当前已在该会话中')
+  })
 })
