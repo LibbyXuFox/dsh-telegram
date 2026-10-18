@@ -31,6 +31,8 @@ interface HarnessSetup {
   sessions?: Array<{ id: string; title?: string; archived?: boolean }>
   /** Whether the current model accepts images. */
   imageInput?: boolean
+  /** Optional host services the extra commands look up through `ctx.get`. */
+  services?: Record<string, unknown>
 }
 
 const temporary: string[] = []
@@ -131,7 +133,10 @@ function createHarness(options: Partial<TelegramBridgeOptions> = {}, setup: Harn
       listeners.set(event, list)
       return () => { list.splice(list.indexOf(listener), 1); return true }
     }),
-    get: vi.fn((name: string) => name === 'userQuestions' ? userQuestions : undefined),
+    get: vi.fn((name: string) => {
+      if (name === 'userQuestions') return userQuestions
+      return setup.services?.[name]
+    }),
     logger: { warn: vi.fn(), error: vi.fn() },
     agents: { get: vi.fn((id: string) => agents.get(id)) },
     systemPrompt: {
@@ -681,5 +686,56 @@ describe('TelegramBridge file delivery', () => {
     completeTurn(h, 'session-1', `给你\n\n[[send: ${target}]]`)
     await waitFor(() => h.client.sendDocument.mock.calls.length > 0, 'document upload')
     expect(h.client.sendDocument).toHaveBeenCalledWith(7, expect.objectContaining({ name: 'notes.txt' }), expect.anything())
+  })
+})
+
+describe('TelegramBridge diagnostics commands', () => {
+  it('reports the measured context usage for the bound session', async () => {
+    const measure = vi.fn(() => ({
+      totalTokens: 1200,
+      surfaceTokens: 1000,
+      baseline: { kind: 'usage', tokens: 200, usage: { inputTokens: 150, outputTokens: 50 } },
+    }))
+    const h = createHarness({}, { services: { tokenMeter: { measure } } })
+    await h.newSession()
+    await h.text('/usage')
+    expect(measure).toHaveBeenCalledTimes(1)
+    expect(h.lastText()).toContain('1200')
+    expect(h.lastText()).toContain('输入')
+  })
+
+  it('explains when no token meter is mounted', async () => {
+    const h = createHarness()
+    await h.newSession()
+    await h.text('/usage')
+    expect(h.lastText()).toContain('未启用 token 计量')
+  })
+
+  it('compacts the bound session and reports the saving', async () => {
+    const compactNow = vi.fn(async () => ({ shadowedTokenCount: 900, shadowedSeqs: [1, 2, 3] }))
+    const h = createHarness({}, { services: { compaction: { compactNow } } })
+    await h.newSession()
+    await h.text('/compact')
+    expect(compactNow).toHaveBeenCalledTimes(1)
+    expect(h.lastText()).toContain('900')
+  })
+
+  it('searches the session corpus and lists hits', async () => {
+    const searchSessions = vi.fn(async () => ({
+      items: [{ header: { id: 'old-session' }, bestMatch: { snippet: '命中的内容' } }],
+    }))
+    const h = createHarness({}, { services: { sessionQuery: { searchSessions } } })
+    await h.newSession()
+    await h.text('/search 关键词')
+    expect(searchSessions).toHaveBeenCalledWith({ query: '关键词', limit: 5 })
+    expect(h.lastText()).toContain('old-session')
+    expect(h.lastText()).toContain('命中的内容')
+  })
+
+  it('shows search usage when no keyword is given', async () => {
+    const h = createHarness()
+    await h.newSession()
+    await h.text('/search')
+    expect(h.lastText()).toContain('用法')
   })
 })
