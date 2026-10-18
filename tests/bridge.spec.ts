@@ -14,6 +14,8 @@ type Listener = (...args: never[]) => unknown
 interface FakeAgent {
   session: { id: string }
   status: 'idle' | 'running'
+  /** Scope the preset registry resolves per-Agent services through. */
+  ctx: Record<string, unknown>
   followup: Mock
   steer: Mock
   cancel: Mock
@@ -67,7 +69,7 @@ function createHarness(options: Partial<TelegramBridgeOptions> = {}, setup: Harn
   const agentFor = (id: string): FakeAgent => {
     let agent = agents.get(id)
     if (agent === undefined) {
-      agent = { session: { id }, status: 'idle', followup: vi.fn(), steer: vi.fn(), cancel: vi.fn() }
+      agent = { session: { id }, status: 'idle', ctx: {}, followup: vi.fn(), steer: vi.fn(), cancel: vi.fn() }
       agents.set(id, agent)
     }
     return agent
@@ -673,6 +675,20 @@ describe('TelegramBridge diagnostics commands', () => {
     await h.text('/compact')
     expect(compactNow).toHaveBeenCalledTimes(1)
     expect(h.lastText()).toContain('900')
+  })
+
+  it('prefers the compaction the agent preset mounts over the host context', async () => {
+    // Compaction lives inside the preset, so the host context has none; only the
+    // preset registry can resolve it for one exact Agent.
+    const compactNow = vi.fn(async () => ({ shadowedTokenCount: 100, shadowedSeqs: [1] }))
+    const serviceFor = vi.fn((_agent: unknown, name: string) =>
+      name === 'compaction' ? { compactNow } : undefined)
+    const h = createHarness({}, { services: { agentPresets: { serviceFor } } })
+    await h.newSession()
+    await h.text('/compact')
+    expect(serviceFor).toHaveBeenCalledWith(expect.anything(), 'compaction')
+    expect(compactNow).toHaveBeenCalledTimes(1)
+    expect(h.lastText()).toContain('已压缩历史')
   })
 
   it('searches the session corpus and lists hits', async () => {
