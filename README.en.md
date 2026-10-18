@@ -130,7 +130,9 @@ Units: `m` minutes, `h` hours, `d` days. Input that cannot be parsed shows the s
 | :--- | :--- | :--- |
 | `/usage` | Context pressure plus the last call's input/output/cache/reasoning tokens | `tokenMeter` |
 | `/compact` | Compact history on demand, reporting folded nodes and saved tokens; refuses while a task runs | `compaction` |
-| `/search <keyword>` | Search every past session, one best snippet per hit | `sessionQuery` |
+| `/search <keyword>` | Search every past session. Hits read "**workspace — session title**" and carry an **open** button that jumps straight into that session | `sessionQuery` |
+
+**How `/search` labels a hit**: the title is folded out of the session log, so an **archived session keeps its name**; a session outside every workspace falls back to its id and gets no button.
 
 **All three services are optional**: when a deployment lacks one, the command explains that it is not enabled instead of failing.
 

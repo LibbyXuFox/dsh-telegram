@@ -132,7 +132,9 @@ DSH_TELEGRAM_ALLOWED_USER_IDS=<你的 Telegram 数字用户 ID>
 | :--- | :--- | :--- |
 | `/usage` | 上下文用量 + 最近一次调用的 input/output/cache/reasoning tokens | `tokenMeter` |
 | `/compact` | 手动压缩历史，报告折叠节点数与节省的 token；任务运行中会拒绝 | `compaction` |
-| `/search 关键词` | 搜索全部历史会话，每个命中给一条最佳片段 | `sessionQuery` |
+| `/search 关键词` | 搜索全部历史会话。命中显示为「**工作区 — 会话名**」并带「打开」按钮，**点一下直接进入该会话** | `sessionQuery` |
+
+**`/search` 的标签**：会话名从会话日志里折叠出来，所以**已归档的会话也保留原名**；不属于任何工作区的会话退化为显示 id，且不给按钮。
 
 **三个服务都是可选的**：部署里没有时，命令会说明"未启用"，而不是报错。
 
