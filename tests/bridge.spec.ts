@@ -742,3 +742,68 @@ describe('TelegramBridge diagnostics commands', () => {
     expect(h.lastText()).toContain('当前已在该会话中')
   })
 })
+
+describe('TelegramBridge scheduled reminders', () => {
+  it('explains when no schedule service is mounted', async () => {
+    const h = createHarness()
+    await h.newSession()
+    await h.text('/schedule')
+    expect(h.lastText()).toContain('未启用定时任务')
+  })
+
+  it('creates a one-shot reminder with a relative delay', async () => {
+    const create = vi.fn(async (_sessionId: string, request: { title: string }) => ({
+      id: 's1', kind: 'after', title: request.title, prompt: '检查部署', scheduledAt: '2026-10-17T20:00:00Z', afterSeconds: 1800,
+    }))
+    const h = createHarness({}, { services: { schedule: { create, list: vi.fn(async () => []), delete: vi.fn() } } })
+    await h.newSession()
+    await h.text('/schedule in 30m 检查部署')
+    expect(create).toHaveBeenCalledWith('session-1', expect.objectContaining({
+      prompt: '检查部署', title: '检查部署', after_seconds: 1800,
+    }), expect.anything())
+    expect(h.lastText()).toContain('已创建提醒')
+    expect(h.lastText()).toContain('30 分钟后')
+  })
+
+  it('creates a daily reminder in the host time zone', async () => {
+    const create = vi.fn(async (_sessionId: string, request: { title: string }) => ({
+      id: 's2', kind: 'daily', title: request.title, prompt: '晨报', scheduledAt: '2026-10-18T08:00:00Z', time: '08:00:00', timeZone: 'UTC',
+    }))
+    const h = createHarness({}, { services: { schedule: { create, list: vi.fn(async () => []), delete: vi.fn() } } })
+    await h.newSession()
+    await h.text('/schedule daily 08:00 晨报')
+    expect(create).toHaveBeenCalledWith('session-1', expect.objectContaining({
+      prompt: '晨报',
+      daily: expect.objectContaining({ time: '08:00:00' }),
+    }), expect.anything())
+  })
+
+  it('lists and deletes reminders of the bound session', async () => {
+    const remove = vi.fn(async () => ({ deleted: true }))
+    const h = createHarness({}, {
+      services: {
+        schedule: {
+          create: vi.fn(),
+          list: vi.fn(async () => [{
+            id: 's1', kind: 'after', title: '检查部署', prompt: '检查部署', scheduledAt: '2026-10-17T20:00:00Z', afterSeconds: 1800,
+          }]),
+          delete: remove,
+        },
+      },
+    })
+    await h.newSession()
+    await h.text('/schedule')
+    expect(h.lastText()).toContain('检查部署')
+    await h.text('/schedule del s1')
+    expect(remove).toHaveBeenCalledWith({ sessionId: 'session-1', id: 's1' }, expect.anything())
+    expect(h.lastText()).toContain('已删除提醒')
+  })
+
+  it('shows the syntax when the request cannot be parsed', async () => {
+    const h = createHarness({}, { services: { schedule: { create: vi.fn(), list: vi.fn(), delete: vi.fn() } } })
+    await h.newSession()
+    await h.text('/schedule 随便说点什么')
+    expect(h.lastText()).toContain('定时任务')
+    expect(h.lastText()).toContain('/schedule in 30m')
+  })
+})

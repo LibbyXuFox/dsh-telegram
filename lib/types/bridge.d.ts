@@ -75,6 +75,11 @@ export declare class TelegramBridge {
     private compactCurrent;
     /** Search the whole session corpus through the optional query service. */
     private searchHistory;
+    /**
+     * Manage reminders bound to the chat's current session.
+     * Delivery reuses the existing session→chat binding, so no extra routing is needed.
+     */
+    private handleSchedule;
     /** Register DSH listeners, publish the command list, and start polling. */
     start(): void;
     /** Stop polling and release Telegram state; DSH sessions and Agents keep running. */
