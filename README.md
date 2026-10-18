@@ -6,7 +6,7 @@ DeepSeek Harness 的 Telegram 机器人插件，主要用于 Linux / WSL2，也�
 
 基于 **DeepSeek Harness v0.2.1-rc.1** 开发，通过 DSH 自带的 `dsh plugin` 安装。
 
-> **本 fork 相对上游的差异**：新增「发文件回 Telegram」（见下）。其余与上游 `IgnatAi401/dsh-telegram` 一致。
+> **本 fork 相对上游的差异**：新增「发文件回 Telegram」「定时提醒」「/usage /compact /search」（见下）。其余与上游 `IgnatAi401/dsh-telegram` 一致。
 
 ## 安装
 
@@ -47,6 +47,10 @@ DSH_TELEGRAM_ALLOWED_USER_IDS=<你的 Telegram 数字用户 ID>
 
 - `/menu`：选择工作区，新建、打开或归档会话，切换模型和推理强度。
 - `/help`：查看可用命令。
+- `/usage`：查看当前会话的上下文用量与最近一次调用的 token。
+- `/compact`：手动压缩当前会话的历史（任务空闲时可用）。
+- `/search 关键词`：在所有历史会话里搜索。
+- `/schedule`：管理绑定到当前会话的定时提醒（见下）。
 - 直接发送文字、图片或文件开始对话。
 
 同一个 token 不要同时运行多个机器人进程。使用其他运行配置时，在安装和卸载命令末尾写上配置名，并用 `npx @deepseek-ai/dsh --profile 配置名` 启动；自定义 `DSH_HOME` 时，`.env` 放在该目录下。
@@ -104,6 +108,33 @@ DSH_TELEGRAM_ALLOWED_USER_IDS=<你的 Telegram 数字用户 ID>
 | `src/index.ts` | `sendFileRoots` 配置项 |
 
 **注意**：指令行必须**独占一行**且以 `[[send:` 开头、`]]` 结尾；写在句子中间不会被识别。
+
+## 定时提醒（本 fork 新增）
+
+提醒**绑定到当前会话**，所以触发时结果会发回同一个 Telegram 对话——不需要额外路由。
+
+| 用法 | 作用 |
+| :--- | :--- |
+| `/schedule` | 列出本会话的提醒 |
+| `/schedule in 30m 内容` | 30 分钟后一次 |
+| `/schedule in 2h 内容` | 2 小时后一次 |
+| `/schedule every 2h 内容` | 每 2 小时 |
+| `/schedule daily 08:00 内容` | 每天 08:00（宿主机的 IANA 时区） |
+| `/schedule del <编号>` | 删除一条 |
+
+单位：`m` 分钟、`h` 小时、`d` 天。无法解析的输入会显示语法说明，不会瞎猜。
+
+**依赖**：`@deepseek-ai/dsh-schedule`（标准组合已挂载）。未挂载时命令会明确提示。
+
+## 用量与历史（本 fork 新增）
+
+| 命令 | 作用 | 依赖的服务 |
+| :--- | :--- | :--- |
+| `/usage` | 上下文用量 + 最近一次调用的 input/output/cache/reasoning tokens | `tokenMeter` |
+| `/compact` | 手动压缩历史，报告折叠节点数与节省的 token；任务运行中会拒绝 | `compaction` |
+| `/search 关键词` | 搜索全部历史会话，每个命中给一条最佳片段 | `sessionQuery` |
+
+**三个服务都是可选的**：部署里没有时，命令会说明"未启用"，而不是报错。
 
 ## 更新
 

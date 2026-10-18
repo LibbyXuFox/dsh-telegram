@@ -6,7 +6,7 @@ A Telegram bot plugin for DeepSeek Harness, primarily for Linux / WSL2, with Des
 
 Developed against **DeepSeek Harness v0.2.1-rc.1** and installed through DSH's own `dsh plugin` command.
 
-> **Difference from upstream**: this fork adds file delivery to Telegram (see below). Everything else matches `IgnatAi401/dsh-telegram`.
+> **Difference from upstream**: this fork adds file delivery, scheduled reminders, and `/usage` `/compact` `/search` (see below). Everything else matches `IgnatAi401/dsh-telegram`.
 
 ## Install
 
@@ -47,6 +47,10 @@ Start DSH: run `npx @deepseek-ai/dsh web` for the CLI, or open the Desktop app. 
 
 - `/menu`: select a workspace, create, open or archive sessions, and switch models and reasoning effort.
 - `/help`: list available commands.
+- `/usage`: show the session's context pressure and the last call's tokens.
+- `/compact`: compact the session's history on demand (while idle).
+- `/search <keyword>`: search every past session.
+- `/schedule`: manage reminders bound to the current session (see below).
 - Send text, images, or files to start chatting.
 
 Do not run multiple bot processes with the same token. For another profile, append its name to the install and uninstall commands and start it with `npx @deepseek-ai/dsh --profile NAME`; with a custom `DSH_HOME`, put `.env` in that directory.
@@ -102,6 +106,33 @@ The plugin removes that line from the body (the user never sees it), uploads the
 | `src/index.ts` | The `sendFileRoots` config field |
 
 **Note**: the directive must be its own line, starting with `[[send:` and ending with `]]`; inside a sentence it is not recognised.
+
+## Scheduled reminders (added by this fork)
+
+A reminder binds to the **current session**, so its result is delivered back into the same Telegram chat — no extra routing.
+
+| Usage | Effect |
+| :--- | :--- |
+| `/schedule` | List this session's reminders |
+| `/schedule in 30m <prompt>` | Once, after 30 minutes |
+| `/schedule in 2h <prompt>` | Once, after 2 hours |
+| `/schedule every 2h <prompt>` | Recurring every 2 hours |
+| `/schedule daily 08:00 <prompt>` | Daily at 08:00 (the host's IANA zone) |
+| `/schedule del <id>` | Delete one |
+
+Units: `m` minutes, `h` hours, `d` days. Input that cannot be parsed shows the syntax instead of guessing.
+
+**Requires** `@deepseek-ai/dsh-schedule` (mounted by the standard composition). Without it the command says so.
+
+## Usage and history (added by this fork)
+
+| Command | Effect | Service used |
+| :--- | :--- | :--- |
+| `/usage` | Context pressure plus the last call's input/output/cache/reasoning tokens | `tokenMeter` |
+| `/compact` | Compact history on demand, reporting folded nodes and saved tokens; refuses while a task runs | `compaction` |
+| `/search <keyword>` | Search every past session, one best snippet per hit | `sessionQuery` |
+
+**All three services are optional**: when a deployment lacks one, the command explains that it is not enabled instead of failing.
 
 ## Update
 
