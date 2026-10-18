@@ -70,6 +70,14 @@ export declare class TelegramBridge {
      * @param options - bridge options.
      */
     constructor(ctx: Context, options: TelegramBridgeOptions);
+    /**
+     * Resolve a service the Agent's own preset mounts.
+     * Compaction and the token meter live inside the preset rather than at Host
+     * level, so `ctx.get` alone finds nothing there; the preset registry resolves
+     * them for one exact Agent. Falls back to the Host context when the Agent
+     * exposes no scope of its own (and in tests).
+     */
+    private agentService;
     /** Report the bound session's context pressure through the optional meter. */
     private showUsage;
     /** Compact the bound session on demand through the optional compaction service. */

@@ -281,6 +281,11 @@ const MY_COMMANDS = [
   { command: 'help', description: '查看使用帮助' },
 ]
 
+/** Minimal shape of the preset registry, which owns each Agent's own services. */
+interface AgentPresetsLike {
+  serviceFor(agent: { ctx: unknown }, name: string): unknown
+}
+
 /** Minimal shapes of the optional host services the extra commands use. */
 interface TokenMeterLike {
   measure(session: unknown): {
@@ -709,6 +714,27 @@ export class TelegramBridge {
     }))
   }
 
+  /**
+   * Resolve a service the Agent's own preset mounts.
+   * Compaction and the token meter live inside the preset rather than at Host
+   * level, so `ctx.get` alone finds nothing there; the preset registry resolves
+   * them for one exact Agent. Falls back to the Host context when the Agent
+   * exposes no scope of its own (and in tests).
+   */
+  private agentService<T>(agent: Agent, name: string): T | undefined {
+    const presets = this.ctx.get('agentPresets') as AgentPresetsLike | undefined
+    const scope = (agent as unknown as { ctx?: unknown }).ctx
+    if (presets !== undefined && scope !== undefined) {
+      try {
+        const found = presets.serviceFor(agent as unknown as { ctx: unknown }, name)
+        if (found !== undefined) return found as T
+      } catch (error) {
+        this.ctx.logger.warn('[telegram] preset service lookup failed: %s', messageOf(error))
+      }
+    }
+    return this.ctx.get(name) as T | undefined
+  }
+
   /** Report the bound session's context pressure through the optional meter. */
   private async showUsage(chatId: number): Promise<void> {
     const active = this.chats.get(chatId)?.active
@@ -716,14 +742,14 @@ export class TelegramBridge {
       await this.safeSend(chatId, '⚠️ **尚未选择会话**\n\n请先打开 /menu 选择工作区和会话。')
       return
     }
-    const meter = this.ctx.get('tokenMeter') as TokenMeterLike | undefined
-    if (meter === undefined) {
-      await this.safeSend(chatId, 'ℹ️ **未启用 token 计量**\n\n当前部署没有挂载 tokenMeter 服务。')
-      return
-    }
     const agent = this.ctx.agents.get(active.sessionId)
     if (agent === undefined) {
       await this.safeSend(chatId, 'ℹ️ **会话当前未激活**\n\n先发一条消息，再查看用量。')
+      return
+    }
+    const meter = this.agentService<TokenMeterLike>(agent, 'tokenMeter')
+    if (meter === undefined) {
+      await this.safeSend(chatId, 'ℹ️ **未启用 token 计量**\n\n当前部署没有挂载 tokenMeter 服务。')
       return
     }
     try {
@@ -759,14 +785,14 @@ export class TelegramBridge {
       await this.safeSend(chatId, '⚠️ **尚未选择会话**\n\n请先打开 /menu 选择工作区和会话。')
       return
     }
-    const compaction = this.ctx.get('compaction') as CompactionLike | undefined
-    if (compaction === undefined) {
-      await this.safeSend(chatId, 'ℹ️ **未启用压缩**\n\n当前部署没有挂载 compaction 服务。')
-      return
-    }
     const agent = this.ctx.agents.get(active.sessionId)
     if (agent === undefined) {
       await this.safeSend(chatId, 'ℹ️ **会话当前未激活**\n\n先发一条消息，再压缩历史。')
+      return
+    }
+    const compaction = this.agentService<CompactionLike>(agent, 'compaction')
+    if (compaction === undefined) {
+      await this.safeSend(chatId, 'ℹ️ **未启用压缩**\n\n当前部署没有挂载 compaction 服务。')
       return
     }
     if (agent.status === 'running') {
