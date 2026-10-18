@@ -134,6 +134,32 @@ Units: `m` minutes, `h` hours, `d` days. Input that cannot be parsed shows the s
 
 **All three services are optional**: when a deployment lacks one, the command explains that it is not enabled instead of failing.
 
+### ⚠️ `/search` must be enabled in DSH first (it is off by default)
+
+The base composition ships full-text session search as **opt-in**:
+
+```yaml
+- id: session-query-sqlite
+  name: '@deepseek-ai/dsh-session-query-sqlite'
+  config:
+    path: ':memory:'
+    openAt: never          # ← off by default; search returns SESSION_QUERY_SEARCH_DISABLED
+```
+
+**Symptom**: `/search` answers "⚠️ 搜索失败 · session search is disabled: … openAt \"never\"".
+
+**To enable it**, add an override in `~/.dsh/profiles/<profile>/cordis.patch.yml`:
+
+```yaml
+- id: session-query-sqlite
+  name: '@deepseek-ai/dsh-session-query-sqlite'
+  config:
+    path: !!js dshHomePath('session-query.sqlite')   # durable; not rebuilt on restart
+    openAt: first-search                             # startup | first-search | never
+```
+
+Then **quit DSH completely (⌘Q) and restart**. `/usage` and `/compact` do not need this.
+
 ## Update
 
 Stop DSH (quit Desktop completely), run the install command again, then start DSH. For a local checkout, `git pull` first and then run `bash install.sh`.

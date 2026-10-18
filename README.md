@@ -136,6 +136,32 @@ DSH_TELEGRAM_ALLOWED_USER_IDS=<你的 Telegram 数字用户 ID>
 
 **三个服务都是可选的**：部署里没有时，命令会说明"未启用"，而不是报错。
 
+### ⚠️ `/search` 需要先在 DSH 里开启（默认是关的）
+
+DSH 基础组合把全文会话搜索设成 **opt-in**：
+
+```yaml
+- id: session-query-sqlite
+  name: '@deepseek-ai/dsh-session-query-sqlite'
+  config:
+    path: ':memory:'
+    openAt: never          # ← 默认关闭，搜索返回 SESSION_QUERY_SEARCH_DISABLED
+```
+
+**症状**：`/search` 回「⚠️ 搜索失败 · session search is disabled: … openAt "never"」。
+
+**开启方式**：在 `~/.dsh/profiles/<profile>/cordis.patch.yml` 里加一条覆盖：
+
+```yaml
+- id: session-query-sqlite
+  name: '@deepseek-ai/dsh-session-query-sqlite'
+  config:
+    path: !!js dshHomePath('session-query.sqlite')   # durable，重启后不重建
+    openAt: first-search                             # startup | first-search | never
+```
+
+改完**必须 ⌘Q 重启 DSH**。`/usage` 与 `/compact` 不需要这一步。
+
 ## 更新
 
 停止 DSH（桌面版需完全退出），重新执行安装命令，再启动 DSH。使用本地仓库时，先 `git pull` 再运行 `bash install.sh`。
