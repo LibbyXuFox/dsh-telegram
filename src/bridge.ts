@@ -286,6 +286,19 @@ interface AgentPresetsLike {
   serviceFor(agent: { ctx: unknown }, name: string): unknown
 }
 
+/**
+ * What each `ManualCompactionError` code means for the human, in the same spirit
+ * as DSH's own `/compact` command: only the last two are real trouble.
+ */
+const COMPACTION_FAILURES: Record<string, string> = {
+  busy: '⏳ **压缩未排队**\n\n有轮次正占用会话。等当前任务结束后再试。',
+  cancelled: 'ℹ️ **压缩已取消**\n\n本次请求被中止，历史没有改动。',
+  changed: 'ℹ️ **历史已变化**\n\n压缩期间会话历史被修改，为避免丢内容已放弃。请稍后重试。',
+  summary: 'ℹ️ **摘要没能更短**\n\n压缩后的摘要不比原文短，所以没有提交——这是服务在拒绝一次没有收益的压缩。\n\n常见原因：会话还不够长，或内容已经很紧凑。压缩主要针对长会话。',
+  commit: '⚠️ **压缩未干净提交**\n\n会话历史可能有变化，重试前请先确认当前状态。',
+  persistence: '⚠️ **压缩完成但未能保存**\n\n会话落盘失败，详细原因见 DSH 日志。',
+}
+
 /** Minimal shapes of the optional host services the extra commands use. */
 interface TokenMeterLike {
   measure(session: unknown): {
@@ -805,8 +818,14 @@ export class TelegramBridge {
         ? 'ℹ️ **无需压缩**\n\n当前历史没有可安全压缩的区段。'
         : `🗜 **已压缩历史**\n\n折叠 ${richLiteral(String(result.shadowedSeqs.length))} 个节点，节省约 ${richLiteral(String(result.shadowedTokenCount))} tokens。`)
     } catch (error) {
-      this.ctx.logger.warn('[telegram] compaction failed: %s', messageOf(error))
-      await this.safeSend(chatId, `⚠️ **压缩失败**\n\n${richCodeBlock(messageOf(error))}`)
+      // ManualCompactionError carries a closed `code`; explain each one instead of
+      // surfacing the backend's English sentence as a bare failure.
+      const code = (error as { code?: unknown }).code
+      const message = messageOf(error)
+      this.ctx.logger.warn('[telegram] compaction failed (%s): %s',
+        typeof code === 'string' ? code : 'unknown', message)
+      const explanation = typeof code === 'string' ? COMPACTION_FAILURES[code] : undefined
+      await this.safeSend(chatId, explanation ?? `⚠️ **压缩失败**\n\n${richCodeBlock(message)}`)
     }
   }
 

@@ -736,6 +736,20 @@ describe('TelegramBridge diagnostics commands', () => {
     expect(h.lastText()).toContain('已压缩历史')
   })
 
+  it('explains a summary that could not shrink instead of reporting a failure', async () => {
+    const error = Object.assign(
+      new Error('manual compaction could not produce a smaller summary'),
+      { code: 'summary' },
+    )
+    const compactNow = vi.fn(async () => { throw error })
+    const h = createHarness({}, { services: { compaction: { compactNow } } })
+    await h.newSession()
+    await h.text('/compact')
+    expect(h.lastText()).toContain('摘要没能更短')
+    // A no-op compaction is not an error the user must act on.
+    expect(h.lastText()).not.toContain('压缩失败')
+  })
+
   it('searches the session corpus and lists hits', async () => {
     const searchSessions = vi.fn(async () => ({
       items: [{ header: { id: 'old-session' }, bestMatch: { snippet: '命中的内容' } }],
