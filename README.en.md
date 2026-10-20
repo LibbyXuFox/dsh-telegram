@@ -134,6 +134,19 @@ Units: `m` minutes, `h` hours, `d` days. Input that cannot be parsed shows the s
 
 **How `/search` labels a hit**: the title is folded out of the session log, so an **archived session keeps its name**; a session outside every workspace falls back to its id and gets no button.
 
+**What `/compact` can report**: `ManualCompactionError` has six codes, and only two are real trouble.
+
+| Code | Meaning | Severity |
+| :--- | :--- | :--- |
+| `busy` | A turn is using the session | ℹ️ Wait for it to finish |
+| `cancelled` | Request aborted; history untouched | ℹ️ No effect |
+| `changed` | History changed mid-compaction, so it gave up | ℹ️ Retry |
+| `summary` | **The summary was not smaller than the source**, so nothing was committed | ℹ️ **Not an error** |
+| `commit` | Did not commit cleanly; history may have changed | ⚠️ Verify state |
+| `persistence` | Compacted but could not be saved | ⚠️ See the DSH log |
+
+> "Could not produce a smaller summary" is normal: the service is **refusing a compaction that would not pay off**. It usually means the session is still short, or already compact.
+
 **All three services are optional**: when a deployment lacks one, the command explains that it is not enabled instead of failing.
 
 ### ⚠️ `/search` must be enabled in DSH first (it is off by default)
