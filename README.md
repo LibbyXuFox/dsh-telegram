@@ -13,13 +13,13 @@ DeepSeek Harness 的 Telegram 机器人插件，主要用于 Linux / WSL2，也�
 命令行版（`npx @deepseek-ai/dsh` 启动）：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/IgnatAi401/dsh-telegram/main/install.sh | bash -s -- install
+curl -fsSL https://raw.githubusercontent.com/LibbyXuFox/dsh-telegram/main/install.sh | bash -s -- install
 ```
 
 桌面版：先完全退出 App，再运行：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/IgnatAi401/dsh-telegram/main/install.sh | bash -s -- install desktop
+curl -fsSL https://raw.githubusercontent.com/LibbyXuFox/dsh-telegram/main/install.sh | bash -s -- install desktop
 ```
 
 如提示找不到 dsh 命令，先在 App 菜单的“管理 dsh 命令…”中安装。在本仓库目录中也可以运行 `bash install.sh` 或 `bash install.sh install desktop`。
@@ -27,10 +27,10 @@ curl -fsSL https://raw.githubusercontent.com/IgnatAi401/dsh-telegram/main/instal
 Windows 桌面版：在 App 菜单的“管理 dsh 命令…”中安装命令，从托盘完全退出 App，再在 PowerShell 中运行：
 
 ```powershell
-dsh plugin --profile desktop add github:IgnatAi401/dsh-telegram
+dsh plugin --profile desktop add github:LibbyXuFox/dsh-telegram
 ```
 
-也可以在 App 的“插件”页添加 `github:IgnatAi401/dsh-telegram`。Windows 上的命令行版请在 WSL2 中按上文安装。
+也可以在 App 的“插件”页添加 `github:LibbyXuFox/dsh-telegram`。Windows 上的命令行版请在 WSL2 中按上文安装。
 
 ## 配置与使用
 
@@ -186,7 +186,7 @@ DSH 基础组合把全文会话搜索设成 **opt-in**：
 停止 DSH 后运行（桌面版在末尾加 `desktop`）：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/IgnatAi401/dsh-telegram/main/install.sh | bash -s -- uninstall
+curl -fsSL https://raw.githubusercontent.com/LibbyXuFox/dsh-telegram/main/install.sh | bash -s -- uninstall
 ```
 
 在本仓库目录中也可以运行 `bash install.sh uninstall`；Windows 桌面版运行 `dsh plugin --profile desktop remove dsh-telegram`。卸载保留 DSH、模型配置、工作区和历史记录；`.env` 中的 Telegram 配置需自行删除。

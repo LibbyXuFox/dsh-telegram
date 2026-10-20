@@ -15,7 +15,7 @@ set -euo pipefail
 ACTION="${1:-install}"
 PROFILE="${2:-${DSH_TELEGRAM_PROFILE:-web}}"
 PACKAGE=dsh-telegram
-REMOTE_SPEC=github:IgnatAi401/dsh-telegram
+REMOTE_SPEC=github:LibbyXuFox/dsh-telegram
 if [ "$#" -gt 2 ] || { [ "$ACTION" != install ] && [ "$ACTION" != uninstall ]; }; then
   echo 'usage: bash install.sh [install|uninstall] [profile]' >&2
   exit 2

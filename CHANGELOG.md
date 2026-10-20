@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0 (fork)
+
+- Deliver workspace files back to Telegram: the agent writes a `[[send: /absolute/path]]` line in its final reply and the bridge uploads the file as a Telegram document (≤50 MiB) before sending the text. Extra readable directories can be declared with the new `sendFileRoots` setting; every path is resolved through `realpath` and must stay inside the workspace or a declared root.
+- Add `/usage` (context window and last-call token breakdown), `/compact` (manual history compaction with per-failure explanations) and `/search` (full-text search across past sessions, hits named "workspace — title" with an open button). `/search` needs the optional `session-query-sqlite` index enabled in the deployment.
+- Add `/schedule` for reminders bound to the chat's session (`in`, `every`, `daily` and `/schedule del`), so a fired reminder is delivered back to the same Telegram chat.
+- Resolve optional services (`tokenMeter`, `compaction`) through the agent's preset rather than the host context, so the commands work in real deployments.
+
 ## 0.3.1
 
 - Target DeepSeek Harness 0.2.1-rc.1: DSH peers and development dependencies move to 0.2.1-rc.1 (cordis 4.0.5, schemastery 3.18.5). DSH 0.2.0-rc.2 now refuses to load the plugin; upgrade DSH first.

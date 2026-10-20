@@ -13,13 +13,13 @@ Developed against **DeepSeek Harness v0.2.1-rc.1** and installed through DSH's o
 CLI (DSH started with `npx @deepseek-ai/dsh`):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/IgnatAi401/dsh-telegram/main/install.sh | bash -s -- install
+curl -fsSL https://raw.githubusercontent.com/LibbyXuFox/dsh-telegram/main/install.sh | bash -s -- install
 ```
 
 Desktop: quit the app completely, then run:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/IgnatAi401/dsh-telegram/main/install.sh | bash -s -- install desktop
+curl -fsSL https://raw.githubusercontent.com/LibbyXuFox/dsh-telegram/main/install.sh | bash -s -- install desktop
 ```
 
 If the dsh command is not found, install it first from the app menu (Manage dsh command…). From this repository you can also run `bash install.sh` or `bash install.sh install desktop`.
@@ -27,10 +27,10 @@ If the dsh command is not found, install it first from the app menu (Manage dsh 
 Windows Desktop: install the command from the app menu (Manage dsh command…), quit the app completely from the tray, then run in PowerShell:
 
 ```powershell
-dsh plugin --profile desktop add github:IgnatAi401/dsh-telegram
+dsh plugin --profile desktop add github:LibbyXuFox/dsh-telegram
 ```
 
-You can also add `github:IgnatAi401/dsh-telegram` on the app's Plugins page. For the CLI on Windows, install inside WSL2 as above.
+You can also add `github:LibbyXuFox/dsh-telegram` on the app's Plugins page. For the CLI on Windows, install inside WSL2 as above.
 
 ## Configure and use
 
@@ -184,7 +184,7 @@ Stop DSH (quit Desktop completely), run the install command again, then start DS
 Stop DSH, then run (append `desktop` for Desktop):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/IgnatAi401/dsh-telegram/main/install.sh | bash -s -- uninstall
+curl -fsSL https://raw.githubusercontent.com/LibbyXuFox/dsh-telegram/main/install.sh | bash -s -- uninstall
 ```
 
 From this repository you can also run `bash install.sh uninstall`; on Windows Desktop run `dsh plugin --profile desktop remove dsh-telegram`. DSH, model settings, workspaces, and history are preserved; remove the Telegram settings from `.env` yourself.
