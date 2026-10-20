@@ -79,7 +79,7 @@ The plugin removes that line from the body (the user never sees it), uploads the
   name: 'dsh-telegram'
   config:
     token: "..."
-    allowedUserIds: [1009204960]
+    allowedUserIds: [<your Telegram user id>]
     sendFileRoots:
       - "~/Desktop"
       - "~/Downloads"

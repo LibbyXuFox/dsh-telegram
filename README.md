@@ -80,7 +80,7 @@ DSH_TELEGRAM_ALLOWED_USER_IDS=<你的 Telegram 数字用户 ID>
   name: 'dsh-telegram'
   config:
     token: "..."
-    allowedUserIds: [1009204960]
+    allowedUserIds: [<your Telegram user id>]
     sendFileRoots:
       - "~/Desktop"
       - "~/Downloads"
